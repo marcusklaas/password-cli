@@ -24,7 +24,6 @@ use crypto::md5::Md5;
 use serialize::base64::FromBase64;
 use serialize::json::Json;
 
-use std::mem::transmute;
 use std::path::Path;
 use std::io::Read;
 use std::fs::File;
@@ -32,7 +31,7 @@ use std::ascii::AsciiExt;
 
 // Decrypts a given block of AES256-CBC data using a 32 byte key and 16 byte
 // initialization vector. Returns error on incorrect passwords 
-fn decrypt_block(block: &[u8], key: &[u8; 32], iv: &[u8; 16]) -> Result<Vec<u8>, SymmetricCipherError> {    
+fn decrypt_block(block: &[u8], key: &[u8; 32], iv: &[u8; 16]) -> Option<Vec<u8>> {    
     let mut decryptor = cbc_decryptor(KeySize::KeySize256, key.as_slice(), iv.as_slice(), PkcsPadding);
     let mut final_result = Vec::<u8>::new();
     let mut buffer = [0; 4096];
@@ -42,12 +41,16 @@ fn decrypt_block(block: &[u8], key: &[u8; 32], iv: &[u8; 16]) -> Result<Vec<u8>,
     macro_rules! do_while_match (($b: block, $e: pat) => (while let $e = $b {}));
 
     do_while_match!({
-        let result = try!(decryptor.decrypt(&mut read_buffer, &mut write_buffer, true));
+        let result = match decryptor.decrypt(&mut read_buffer, &mut write_buffer, true) {
+            Ok(x)   => x,
+            Err(..) => return None
+        };
+        
         final_result.push_all(write_buffer.take_read_buffer().take_remaining());
         result
     }, BufferResult::BufferOverflow);
 
-    Ok(final_result)
+    Some(final_result)
 }
 
 fn derive_key(salted_password: &[u8]) -> (Box<[u8; 32]>, Box<[u8; 16]>) {
@@ -83,42 +86,39 @@ pub fn read_file(path: &Path) -> Vec<u8> {
 }
 
 pub fn decode_buffer(buffer: &[u8], password: String) -> Option<Vec<u8>> {
-    let bytes = buffer.as_slice().from_base64().unwrap();
+    let bytes = match buffer.as_slice().from_base64() {
+        Ok(x)   => x,
+        Err(..) => return None
+    };
+    
     let salt = &bytes[8..16];
     let mut salted_password = password.into_bytes();
     salted_password.push_all(salt);
 
     let (key, iv) = derive_key(&salted_password);
 
-    let decrypted = decrypt_block(&bytes[16..], &key, &iv).unwrap();
-    
-    Some(decrypted)
+    decrypt_block(&bytes[16..], &key, &iv)
 }
 
-pub fn download_file(url: &str) -> Vec<u8> {
-    // Create a client.
-    let mut client = Client::new();
-
-    // Creating an outgoing request.
-    let mut res = client.get(url)
-        // set a header
+pub fn download_file(url: &str) -> Option<Vec<u8>> {
+    Client::new()
+        .get(url)
         .header(Connection(vec![ConnectionOption::Close]))
-        // let 'er go!
-        .send().unwrap();
-
-    // Read the Response.
+        .send()
+        .ok()
+        .and_then(|mut response| {
+            response.read_to_end().ok()
+        })
 
     // FIXME: this should use new Read trait at some point
-    //let mut buffer = Vec::new();
-    res.read_to_end().unwrap()
 }
 
-pub fn parse_json(data: &[u8]) -> Json {
-    let string: &str = unsafe { transmute(data) };
+pub fn parse_json(data: &[u8]) -> Option<Json> {
+    let string = String::from_utf8_lossy(data);
 
-    clipboard::write("foo").unwrap();
+    //clipboard::write("foo").unwrap();
     
-    Json::from_str(string).unwrap()
+    Json::from_str(&*string).ok()
 }
 
 pub fn print_passwords(json: Json, needle: &[String]) {
@@ -151,14 +151,16 @@ pub fn print_passwords(json: Json, needle: &[String]) {
     }
 }
 
+// expects the needles to be in lowercase already
 fn test_match(needle: &[String], haystack: &str) -> bool {
     let lower = haystack.to_ascii_lowercase();
     
     needle.iter().map(|str| lower.contains(&str)).fold(true, |a, b| { a && b })
 }
 
+#[cfg(test)]
 mod test {
-    use super::derive_key;
+    use super::{test_match, derive_key};
 
     #[test]
     pub fn key_derivation() {
@@ -170,5 +172,14 @@ mod test {
 
         assert_eq!(expected_key, *key);
         assert_eq!(expected_iv, *iv);
+    }
+
+    #[test]
+    pub fn title_matching() {
+        assert!(test_match(&[format!("nana")], "banana"));
+        assert!(test_match(&[format!("nana"), format!("i li"), format!("i like bananas")], "i like banAnas"));
+        assert!(test_match(&[], "test"));
+
+        assert!( ! test_match(&[format!("test")], "tes"));
     }
 }
