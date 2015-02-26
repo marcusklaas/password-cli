@@ -1,0 +1,13 @@
+[package]
+
+name = "password-cli"
+version = "0.0.1"
+authors = ["Marcus Klaas <mail@marcusklaas.nl>"]
+
+[lib]
+name = "password-cli"
+
+[dependencies]
+hyper = "*"
+rustc-serialize = "*"
+rust-crypto = "*"
