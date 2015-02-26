@@ -11,3 +11,6 @@ name = "password-cli"
 hyper = "*"
 rustc-serialize = "*"
 rust-crypto = "*"
+
+[dependencies.clipboard]
+git = "https://github.com/marcusklaas/clipboard.git"

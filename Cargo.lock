@@ -2,10 +2,16 @@
 name = "password-cli"
 version = "0.0.1"
 dependencies = [
+ "clipboard 0.0.1 (git+https://github.com/marcusklaas/clipboard.git)",
  "hyper 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "clipboard"
+version = "0.0.1"
+source = "git+https://github.com/marcusklaas/clipboard.git#4dac038517a991f96bdd6cc60db1d5f8beaf93d3"
 
 [[package]]
 name = "cookie"

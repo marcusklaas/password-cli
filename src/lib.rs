@@ -7,6 +7,7 @@
 extern crate "rustc-serialize" as serialize;
 extern crate crypto;
 extern crate hyper;
+extern crate clipboard;
 
 use hyper::client::Client;
 use hyper::header::Connection;
@@ -49,41 +50,26 @@ fn decrypt_block(block: &[u8], key: &[u8; 32], iv: &[u8; 16]) -> Result<Vec<u8>,
     Ok(final_result)
 }
 
-// FIXME: this could be made way nicer
 fn derive_key(salted_password: &[u8]) -> (Box<[u8; 32]>, Box<[u8; 16]>) {
-    let rounds = 3;
-    let mut result = Vec::new();
     let mut last_hash = Vec::new();
     let mut hasher = Md5::new();
-    let mut buffer = [0u8; 16];
-
-    hasher.input(salted_password);
-    hasher.result(&mut buffer);
-    result.push_all(&buffer);
-    last_hash.push_all(&buffer);
-
-    for _ in 0..rounds {
-        last_hash.push_all(salted_password);
-        
-        hasher.reset();
-        hasher.input(&last_hash);
-        hasher.result(&mut buffer);
-
-        last_hash.clear();
-        last_hash.push_all(&buffer);
-        result.push_all(&buffer);
-    }
-
     let mut key = Box::new([0u8; 32]);
     let mut iv = Box::new([0u8; 16]);
 
-    for i in 0..32 {
-        key[i] = result[i];
+    for i in 0..2 {
+        let slice = &mut(*key)[16 * i.. 16 * (i + 1)];
+        
+        last_hash.push_all(salted_password);
+        hasher.input(&last_hash);
+        hasher.result(slice);
+        hasher.reset();
+        last_hash.clear();
+        last_hash.push_all(slice);
     }
 
-    for i in 32..48 {
-        iv[i - 32] = result[i];
-    }
+    last_hash.push_all(salted_password);
+    hasher.input(&last_hash);
+    hasher.result(&mut *iv);
 
     (key, iv)
 }
@@ -129,6 +115,8 @@ pub fn download_file(url: &str) -> Vec<u8> {
 
 pub fn parse_json(data: &[u8]) -> Json {
     let string: &str = unsafe { transmute(data) };
+
+    clipboard::write("foo").unwrap();
     
     Json::from_str(string).unwrap()
 }
@@ -167,4 +155,20 @@ fn test_match(needle: &[String], haystack: &str) -> bool {
     let lower = haystack.to_ascii_lowercase();
     
     needle.iter().map(|str| lower.contains(&str)).fold(true, |a, b| { a && b })
+}
+
+mod test {
+    use super::derive_key;
+
+    #[test]
+    pub fn key_derivation() {
+        let input: &[u8] = &[99, 111, 111, 108, 70, 111, 120, 104, 111, 108, 101, 115, 49, 50, 119, 97, 116, 101, 114, 115, 181, 138, 204, 219, 241, 200, 166, 229];
+        let expected_key: [u8; 32] = [37, 185, 158, 246, 99, 13, 114, 43, 244, 181, 210, 162, 153, 245, 60, 166, 139, 117, 60, 11, 26, 17, 113, 150, 229, 17, 239, 94, 76, 140, 73, 70];
+        let expected_iv: [u8; 16] = [99, 251, 72, 212, 242, 59, 128, 184, 140, 87, 142, 238, 94, 138, 133, 223];
+
+        let (key, iv) = derive_key(input);
+
+        assert_eq!(expected_key, *key);
+        assert_eq!(expected_iv, *iv);
+    }
 }
