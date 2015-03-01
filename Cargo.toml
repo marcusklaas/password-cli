@@ -8,7 +8,7 @@ authors = ["Marcus Klaas <mail@marcusklaas.nl>"]
 name = "password-cli"
 
 [dependencies]
-hyper = "*"
+#hyper = "*"
 rustc-serialize = "*"
 rust-crypto = "*"
 

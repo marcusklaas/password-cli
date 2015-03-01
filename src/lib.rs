@@ -4,14 +4,14 @@
 #![feature(io)]
 #![feature(collections)]
 
-extern crate "rustc-serialize" as serialize;
+extern crate "rustc-serialize" as rustc_serialize;
 extern crate crypto;
-extern crate hyper;
 extern crate clipboard;
 
-use hyper::client::Client;
-use hyper::header::Connection;
-use hyper::header::ConnectionOption;
+//extern crate hyper;
+//use hyper::client::Client;
+//use hyper::header::Connection;
+//use hyper::header::ConnectionOption;
 
 use crypto::aes::{cbc_decryptor, KeySize};
 use crypto::symmetriccipher::SymmetricCipherError;
@@ -21,13 +21,63 @@ use crypto::blockmodes::PkcsPadding;
 use crypto::digest::Digest;
 use crypto::md5::Md5;
 
-use serialize::base64::FromBase64;
-use serialize::json::Json;
+use rustc_serialize::base64::{ToBase64, FromBase64};
+use rustc_serialize::json::{self, decode, Json, DecodeResult, DecoderError};
 
 use std::path::Path;
-use std::io::Read;
+use std::io::{self, Read};
 use std::fs::File;
+use std::iter::{IntoIterator, Filter};
 use std::ascii::AsciiExt;
+
+#[derive(RustcDecodable, RustcEncodable)]
+pub struct PasswordEntry {
+    pub title: String,
+    pub url: String,
+    pub username: String,
+    pub password: String,
+    pub comment: String
+}
+
+impl PasswordEntry {
+    pub fn write_to_clipboard(&self) -> bool {
+        clipboard::write(&self.password).is_ok()
+    }
+
+    pub fn get_title<'a>(&'a self) -> &'a str {
+        &self.title
+    }
+}
+
+#[derive(RustcDecodable, RustcEncodable)]
+pub struct PasswordLibrary {
+    pub modified: u64,
+    pub list: Vec<PasswordEntry>
+}
+
+impl PasswordLibrary {
+    pub fn from_json_bytes(bytes: &[u8]) -> DecodeResult<PasswordLibrary> {
+        let string = String::from_utf8_lossy(bytes);
+    
+        json::decode(&*string)
+    }
+
+    pub fn get_entries<'a>(&'a self) -> &'a[PasswordEntry] {
+        &self.list
+    }
+}
+
+pub fn print_password_list<'a, I>(list: I) where I: Iterator<Item=&'a PasswordEntry> {
+    println!("+-{0:-<5}-+-{0:-<30}-+-{0:-<35}-+-{0:-<35}-+", "");
+    println!("| {0: ^5} | {1: ^30} | {2: ^35} | {3: ^35} |", "id", "title", "username", "url");
+    println!("+-{0:-<5}-+-{0:-<30}-+-{0:-<35}-+-{0:-<35}-+", "");
+    
+    for (i, entry) in list.enumerate() {
+        println!("| {: >5} | {: <30} | {: <35} | {: <35} |", i + 1, entry.title, entry.username, entry.url);
+    }
+
+    println!("+-{0:-<5}-+-{0:-<30}-+-{0:-<35}-+-{0:-<35}-+", "");
+}
 
 // Decrypts a given block of AES256-CBC data using a 32 byte key and 16 byte
 // initialization vector. Returns error on incorrect passwords 
@@ -77,12 +127,13 @@ fn derive_key(salted_password: &[u8]) -> (Box<[u8; 32]>, Box<[u8; 16]>) {
     (key, iv)
 }
 
-pub fn read_file(path: &Path) -> Vec<u8> {
-    let mut file = File::open(path).unwrap();
+pub fn read_file(path: &Path) -> io::Result<Vec<u8>> {
+    let mut file = try!(File::open(path));
     let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer);
+    
+    try!(file.read_to_end(&mut buffer));
 
-    buffer
+    Ok(buffer)
 }
 
 pub fn decode_buffer(buffer: &[u8], password: String) -> Option<Vec<u8>> {
@@ -101,61 +152,34 @@ pub fn decode_buffer(buffer: &[u8], password: String) -> Option<Vec<u8>> {
 }
 
 pub fn download_file(url: &str) -> Option<Vec<u8>> {
-    Client::new()
-        .get(url)
-        .header(Connection(vec![ConnectionOption::Close]))
-        .send()
-        .ok()
-        .and_then(|mut response| {
-            response.read_to_end().ok()
-        })
+    //Client::new()
+      //  .get(url)
+        //.header(Connection(vec![ConnectionOption::Close]))
+        //.send()
+        //.ok()
+        //.and_then(|mut response| {
+        //    response.read_to_end().ok()
+        //})
 
+    None
     // FIXME: this should use new Read trait at some point
 }
 
-pub fn parse_json(data: &[u8]) -> Option<Json> {
-    let string = String::from_utf8_lossy(data);
-
-    //clipboard::write("foo").unwrap();
-    
-    Json::from_str(&*string).ok()
+pub fn find_password<'a>(json: &'a Json, needle: &[String]) -> Option<&'a[&'a PasswordEntry]> {
+    None
 }
 
-pub fn print_passwords(json: Json, needle: &[String]) {
-    let list = json.find("list").unwrap();
-
-    let vec = match list {
-        &Json::Array(ref vec) => vec,
-        _                     => panic!("List isn't an array!")
-    };
-
-    for item in vec.iter() {
-        let title = match item.find("title").unwrap() {
-            &Json::String(ref str) => str,
-            _                      => panic!("Title isn't a string!")
-        };
-
-        let user = match item.find("username").unwrap() {
-            &Json::String(ref str) => str,
-            _                      => panic!("Username isn't a string!")
-        };
-
-        let password = match item.find("password").unwrap() {
-            &Json::String(ref str) => str,
-            _                      => panic!("Password isn't a string!")
-        };
-
-        if test_match(needle, title) {
-            println!("{: <30} | {: <30} | {: <}", title, user, password);
-        }
-    }
+pub fn test_entry<I>(needles: I, haystack: &PasswordEntry) -> bool
+                        where I: Iterator, <I as Iterator>::Item: Str {
+    test_match(needles, &haystack.get_title())
 }
 
 // expects the needles to be in lowercase already
-fn test_match(needle: &[String], haystack: &str) -> bool {
+fn test_match<I>(needles: I, haystack: &str) -> bool
+                    where I: Iterator, <I as Iterator>::Item: Str {
     let lower = haystack.to_ascii_lowercase();
     
-    needle.iter().map(|str| lower.contains(&str)).fold(true, |a, b| { a && b })
+    needles.map(|needle| lower.contains(&needle.as_slice())).fold(true, |a, b| { a && b })
 }
 
 #[cfg(test)]
