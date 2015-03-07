@@ -10,7 +10,15 @@ name = "password-cli"
 [dependencies]
 #hyper = "*"
 rustc-serialize = "*"
-rust-crypto = "*"
+#rust-crypto = "*"
 
 [dependencies.clipboard]
 git = "https://github.com/marcusklaas/clipboard.git"
+
+[dependencies.rust-crypto]
+git = "https://github.com/marcusklaas/rust-crypto.git"
+rev = "20f6877a05"
+
+[dependencies.hyper]
+git = "https://github.com/hyperium/hyper.git"
+rev = "2ce4385c163e1a9a393c89743cf04e047b776e83"

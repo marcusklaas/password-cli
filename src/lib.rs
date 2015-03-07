@@ -1,17 +1,16 @@
 #![feature(core)]
-#![feature(path)]
-#![feature(fs)]
 #![feature(io)]
+#![feature(path)]
 #![feature(collections)]
 
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate crypto;
 extern crate clipboard;
+extern crate hyper;
 
-//extern crate hyper;
-//use hyper::client::Client;
-//use hyper::header::Connection;
-//use hyper::header::ConnectionOption;
+use hyper::client::Client;
+use hyper::header::Connection;
+use hyper::header::ConnectionOption;
 
 use crypto::aes::{cbc_decryptor, KeySize};
 use crypto::symmetriccipher::SymmetricCipherError;
@@ -21,13 +20,12 @@ use crypto::blockmodes::PkcsPadding;
 use crypto::digest::Digest;
 use crypto::md5::Md5;
 
-use rustc_serialize::base64::{ToBase64, FromBase64};
-use rustc_serialize::json::{self, decode, Json, DecodeResult, DecoderError};
+use rustc_serialize::base64::{FromBase64};
+use rustc_serialize::json::{self, decode, DecodeResult};
 
 use std::path::Path;
 use std::io::{self, Read};
 use std::fs::File;
-use std::iter::{IntoIterator, Filter};
 use std::ascii::AsciiExt;
 
 #[derive(RustcDecodable, RustcEncodable)]
@@ -152,21 +150,19 @@ pub fn decode_buffer(buffer: &[u8], password: String) -> Option<Vec<u8>> {
 }
 
 pub fn download_file(url: &str) -> Option<Vec<u8>> {
-    //Client::new()
-      //  .get(url)
-        //.header(Connection(vec![ConnectionOption::Close]))
-        //.send()
-        //.ok()
-        //.and_then(|mut response| {
-        //    response.read_to_end().ok()
-        //})
-
-    None
-    // FIXME: this should use new Read trait at some point
-}
-
-pub fn find_password<'a>(json: &'a Json, needle: &[String]) -> Option<&'a[&'a PasswordEntry]> {
-    None
+    Client::new()
+        .get(url)
+        .header(Connection(vec![ConnectionOption::Close]))
+        .send()
+        .ok()
+        .and_then(|mut response| {
+            let mut buffer = Vec::new();
+            
+            match response.read_to_end(&mut buffer) {
+                Ok(..)  => Some(buffer),
+                Err(..) => None
+            }
+        })
 }
 
 pub fn test_entry<I>(needles: I, haystack: &PasswordEntry) -> bool

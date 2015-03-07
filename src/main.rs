@@ -1,9 +1,7 @@
-#![feature(env)]
 #![feature(path)]
 
 extern crate "password-cli" as cli;
 
-use std::path::Path;
 use cli::{read_file, download_file, print_password_list, PasswordLibrary, PasswordEntry, decode_buffer, test_entry};
 use std::env::{self, home_dir};
 use std::ascii::AsciiExt;
@@ -42,7 +40,7 @@ fn main() {
     
     let buffer = read_file(&library_path).unwrap();
 
-    print!("Enter your master password: ");
+    print!("Enter the master password: ");
 
     let mut stdin = stdin();
     let mut password = stdin.read_line().unwrap();
