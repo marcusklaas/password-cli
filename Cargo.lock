@@ -3,9 +3,10 @@ name = "password-cli"
 version = "0.0.1"
 dependencies = [
  "clipboard 0.0.1 (git+https://github.com/marcusklaas/clipboard.git)",
- "hyper 0.2.1 (git+https://github.com/hyperium/hyper.git?rev=2ce4385c163e1a9a393c89743cf04e047b776e83)",
- "rust-crypto 0.2.20 (git+https://github.com/marcusklaas/rust-crypto.git?rev=20f6877a05)",
+ "hyper 0.3.0 (git+https://github.com/hyperium/hyper.git)",
+ "rust-crypto 0.2.23 (git+https://github.com/dagenix/rust-crypto.git)",
  "rustc-serialize 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -31,8 +32,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "hyper"
-version = "0.2.1"
-source = "git+https://github.com/hyperium/hyper.git?rev=2ce4385c163e1a9a393c89743cf04e047b776e83#2ce4385c163e1a9a393c89743cf04e047b776e83"
+version = "0.3.0"
+source = "git+https://github.com/hyperium/hyper.git#79200ed49646331700853521ec688c9de5515197"
 dependencies = [
  "cookie 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -41,7 +42,6 @@ dependencies = [
  "rustc-serialize 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicase 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "unsafe-any 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 0.2.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -117,8 +117,8 @@ dependencies = [
 
 [[package]]
 name = "rust-crypto"
-version = "0.2.20"
-source = "git+https://github.com/marcusklaas/rust-crypto.git?rev=20f6877a05#20f6877a051c61b264fdeb9688e65d9b545e9d68"
+version = "0.2.23"
+source = "git+https://github.com/dagenix/rust-crypto.git#e2ba6ea926782278222558557d3d87221b87c740"
 dependencies = [
  "rand 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -142,11 +142,6 @@ dependencies = [
 [[package]]
 name = "unicase"
 version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "unsafe-any"
-version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]

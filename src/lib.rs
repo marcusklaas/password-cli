@@ -7,6 +7,7 @@ extern crate "rustc-serialize" as rustc_serialize;
 extern crate crypto;
 extern crate clipboard;
 extern crate hyper;
+extern crate time;
 
 use hyper::client::Client;
 use hyper::header::Connection;
@@ -23,9 +24,11 @@ use crypto::md5::Md5;
 use rustc_serialize::base64::{FromBase64};
 use rustc_serialize::json::{self, decode, DecodeResult};
 
+use time::get_time;
+
 use std::path::Path;
-use std::io::{self, Read};
-use std::fs::File;
+use std::io::{self, Read, Write, ErrorKind};
+use std::fs::{metadata, File};
 use std::ascii::AsciiExt;
 
 #[derive(RustcDecodable, RustcEncodable)]
@@ -65,6 +68,57 @@ impl PasswordLibrary {
     }
 }
 
+/**
+ * returns whether or not library is present and up-to-date
+ */
+pub fn library_is_fresh(library_path: &Path, max_age_milliseconds: u64) -> Option<bool> {
+    match metadata(library_path) {
+        Err(e) => {
+            match e.kind() {
+                ErrorKind::FileNotFound => return Some(false),
+                _                       => return None
+            }
+        },
+        Ok(meta) => {
+            let now = epoch_milliseconds();
+            let is_fresh = meta.modified() + max_age_milliseconds >= now;
+
+            Some(is_fresh)
+        }
+    }
+}
+
+pub fn refresh_library(library_path: &Path, url_path: &Path) -> Option<()> {
+    read_file(url_path).ok()
+        .and_then(|url_bytes| {
+            String::from_utf8(url_bytes).ok()
+        })
+        .and_then(|url| {
+            download_library(library_path, &url)
+        })
+}
+
+fn download_library(library_path: &Path, url: &str) -> Option<()> {  
+    download_file(&url).and_then(|buffer| {
+        write_to_disk(library_path, &buffer).ok()
+    })
+}
+
+fn write_to_disk(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut file = try!(File::create(path));
+
+    try!(file.write_all(bytes));
+    file.sync_all()
+}
+
+fn epoch_milliseconds() -> u64 {
+    let stamp = get_time();
+    
+    stamp.nsec as u64 / 1000 / 1000 + stamp.sec as u64 * 1000
+}
+
+// TODO: somehow we should be able to parameterize the widths of the columns
+// TODO: return String instead?
 pub fn print_password_list<'a, I>(list: I) where I: Iterator<Item=&'a PasswordEntry> {
     println!("+-{0:-<5}-+-{0:-<30}-+-{0:-<35}-+-{0:-<35}-+", "");
     println!("| {0: ^5} | {1: ^30} | {2: ^35} | {3: ^35} |", "id", "title", "username", "url");
